@@ -18,14 +18,14 @@ def invite_new_players(api):
   len_timeline = len(timeline)
   for tweet in timeline:
     if tweet.id not in GAME_TWEETS_LIST and not tweet.in_reply_to_status_id_str:
+      GAME_TWEETS_LIST.append(tweet.id)
+      GAME_REPLIES_DICT[int(tweet.id)] = []
       print(tweet.id, GAME_TWEETS_LIST, GAME_REPLIES_DICT)
       print(f"{tweet.user.name} said {tweet.text}")
       sn = tweet.user.screen_name
       m = "@%s Hello! Let's play chess. Here's the board: \n" % (sn)
       board = create_chess_board()
       s = print_board_text(api, tweet, sn, board, m)
-      GAME_TWEETS_LIST.append(tweet.id)
-      GAME_REPLIES_DICT[int(tweet.id)] = []
       GAME_REPLIES_DICT[int(tweet.id)].append(s.id)
 
 
@@ -34,10 +34,7 @@ def parse_latest_replies(api):
   Parses the games' tweet threads to get the latest move. Checks validity of each move. Prints the updated board.
   """
   get_latest_replies(api)
-  #for game in GAME_REPLIES_DICT:
-    #latest_move = game[0].text
-    #print(latest_move + "this is latest!!!")
-    #check_validity(latest_move)
+  latest_reply = api.get_status()
 
 
 def get_latest_replies(api):
@@ -60,6 +57,12 @@ def get_latest_replies(api):
 def print_board_text(api, tweet, sn, board, optional_msg=None):
   """
   Prints the current status of the chess board in text format in a new reply
+
+  :param api: API object
+  :param tweet: Status object for the tweet to reply to
+  :param sn: screen name
+  :param board: chess.Board object
+  :param optional_msg: optional message to be printed with the board
   """
   message = str(board)+'\n\n'+"Play the next move..."
   if optional_msg:
@@ -88,6 +91,8 @@ def main():
       GAME_TWEETS_LIST = json.load(f)
   except:
     None
+
+  GAME_REPLIES_DICT = {int(k):v for k,v in GAME_REPLIES_DICT.items()}
 
   api = create_api()
   invite_new_players(api)
