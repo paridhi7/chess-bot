@@ -49,6 +49,29 @@ def update_board(game, move):
     print("Invalid move" + str(popped))
 
 
+def check_results(game):
+  """
+  Checks the results of the game and returns the appropriate message.
+  """
+  board = chess.Board(GAME_BOARD_DICT[game])
+
+  if board.is_checkmate():
+    msg = "checkmate: " + GAME_PLAYER[game][int(not board.turn)] + " wins!"
+  elif board.is_check():
+    msg = "check"
+  elif board.is_stalemate():
+    msg = "draw: stalemate"
+  elif board.is_fivefold_repetition():
+    msg = "draw: 5-fold repetition"
+  elif board.is_insufficient_material():
+    msg = "draw: insufficient material"
+  elif board.can_claim_draw():
+    msg = "draw: claim"
+  else:
+    msg = ""
+  return msg
+
+
 def parse_latest_replies(api):
   """
   Parses the games' tweet threads to get the latest move. Checks validity of each move. Prints the updated board.
@@ -60,9 +83,11 @@ def parse_latest_replies(api):
       if is_valid_turn(game, api):
         latest_reply = api.get_status(GAME_REPLIES_DICT[game][-1]).text.split()[-1]
         update_board(game, latest_reply)
+        result = check_results(game)
         print_board_text(api=api, 
                          tweet=api.get_status(int(GAME_REPLIES_DICT[game][-1])),
-                         board=chess.Board(GAME_BOARD_DICT[game]))
+                         board=chess.Board(GAME_BOARD_DICT[game]),
+                         optional_msg=result)
       else:
         GAME_REPLIES_DICT[game].pop()
 
