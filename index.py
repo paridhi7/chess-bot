@@ -1,16 +1,17 @@
 import tweepy
 import chess
 import chess.svg
-from config import create_api
 import json
+import os
+
+from cairosvg import svg2png
+from config import create_api
 
 GAME_TWEETS_LIST = []
 GAME_REPLIES_DICT = {} # dictionary with keys as individual games; values as lists of all replies to that game from least recent to most recent
-GAME_BOARD_DICT = {} # dictionary with keys as individual games; values as text representation of the latest chess board
-GAME_PLAYER = {} 
+GAME_BOARD_DICT = {} # dictionary with keys as individual games; values as FEN representation of the latest chess board
+GAME_PLAYER = {}  # dictionary of dictionary with outer keys as individual games; values as dictionary storing player's Twitter handles
 
-#{"123232354950976": ["13235032909", "391039239231111", "3121233239999", "868769806"],
-# "134433434343435": ["19039344344", "429222122111111"]}
 
 def invite_new_players(api):
   """
@@ -28,7 +29,7 @@ def invite_new_players(api):
       sn = tweet.user.screen_name
       m = "Hello! Let's play chess. Here's the board: \n"
       board = create_chess_board(int(tweet.id))
-      s = print_board_text(api, tweet, board, m)
+      s = print_board(api, tweet, board, m)
       GAME_REPLIES_DICT[int(tweet.id)].append(s.id)
 
 
@@ -56,9 +57,9 @@ def check_results(game):
   board = chess.Board(GAME_BOARD_DICT[game])
 
   if board.is_checkmate():
-    msg = "checkmate: " + GAME_PLAYER[game][int(not board.turn)] + " wins!"
+    msg = "CHECKMATE: " + GAME_PLAYER[game][int(not board.turn)] + " WINS!"
   elif board.is_check():
-    msg = "check"
+    msg = "CHECK"
   elif board.is_stalemate():
     msg = "draw: stalemate"
   elif board.is_fivefold_repetition():
@@ -69,7 +70,7 @@ def check_results(game):
     msg = "draw: claim"
   else:
     msg = ""
-  return msg
+  return msg + "\n"
 
 
 def parse_latest_replies(api):
@@ -84,7 +85,7 @@ def parse_latest_replies(api):
         latest_reply = api.get_status(GAME_REPLIES_DICT[game][-1]).text.split()[-1]
         update_board(game, latest_reply)
         result = check_results(game)
-        print_board_text(api=api, 
+        print_board(api=api, 
                          tweet=api.get_status(int(GAME_REPLIES_DICT[game][-1])),
                          board=chess.Board(GAME_BOARD_DICT[game]),
                          optional_msg=result)
@@ -111,7 +112,7 @@ def is_valid_turn(game, api):
 
 def get_latest_replies(api):
   """
-  Stores the latest tweets for each ongoing game
+  Stores the latest tweets for each ongoing game and sets games' players
   """
   timeline = api.mentions_timeline()
   for tweet in timeline:
@@ -128,9 +129,9 @@ def get_latest_replies(api):
             GAME_REPLIES_DICT[game].extend([parent_tweet, tweet.id])
             if not GAME_PLAYER[game][0]:
               GAME_PLAYER[game][0] = tweet.user.screen_name
-  
+              
 
-def print_board_text(api, tweet, board, optional_msg=""):
+def print_board(api, tweet, board, optional_msg="", text_only=False):
   """
   Prints the current status of the chess board in text format in a new reply
 
@@ -142,12 +143,41 @@ def print_board_text(api, tweet, board, optional_msg=""):
   sn = tweet.user.screen_name
   msg = "@%s " % (sn)
   optional_msg = msg + optional_msg + "\n"
-  message = optional_msg + str(board)+'\n\n'+"Play the next move (Capital=White)..."
-  try:
-    s = api.update_status(message, tweet.id)
-    return s
-  except tweepy.error.TweepError:
-    print("Already replied to this tweet")
+  message = optional_msg
+  if text_only:
+    message += str(board)
+  message += '\n\n'+"Play the next move (Capital=White)..."
+
+  if text_only:
+    try:
+      s = api.update_status(message, tweet.id)
+      return s
+    except tweepy.error.TweepError:
+      print("Already replied to this tweet")
+  else:
+    img = get_board_png(board)
+    try:
+      s = api.update_with_media(filename=img, 
+        status=message,
+        in_reply_to_status_id=tweet.id)
+      return s
+    except tweepy.error.TweepError:
+      print("Already replied to this tweet")
+    os.remove(img)
+
+
+def get_board_png(board):
+  """
+  Generates a png file from the board and returns the png filename
+
+  :param board: chess.Board object
+  :return: String containing the png filename
+  """
+  svg_xml = chess.svg.board(board=board)
+  png_filename = "board.png"
+  svg2png(bytestring=svg_xml, write_to=png_filename)
+
+  return png_filename
 
 
 def create_chess_board(game):
@@ -202,17 +232,3 @@ if __name__=="__main__":
   main()
   #create_chess_board()
 
-
-
-"""
-class Tweet:
-  text = ""
-  username = ""
-  time = ""
-
-  in_reply_to_status_id_str = None #id of parent tweet
-
-  def _check_if_parent_exists_and_update_its_id()
-  if original exists:
-    in_reply_to_status_id_str = original.id
-"""
