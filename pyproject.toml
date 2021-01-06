@@ -9,7 +9,7 @@ description = ""
 name = "chess-bot-1"
 version = "0.1.0"
 [tool.poetry.dependencies]
-cairosvg = "^2.4"
+cairosvg = "^2.5"
 drawsvg = "^1.5"
 ipython = "^7.14"
 python = "^3.7"
